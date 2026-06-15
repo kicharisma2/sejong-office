@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>정부청사 사무실 안내 시스템</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-logo">
+        <div class="logo-emblem">🏛️</div>
+        <div class="logo-text">
+          <span class="logo-main">정부청사</span>
+          <span class="logo-sub">사무실 안내 시스템</span>
+        </div>
+      </div>
+      <nav class="header-nav">
+        <button class="nav-btn active" data-tab="search">🔍 검색</button>
+        <button class="nav-btn" data-tab="upload">📷 사진 분석</button>
+        <button class="nav-btn" data-tab="database">📋 데이터 관리</button>
+        <button class="nav-btn" data-tab="settings">⚙️ 설정</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- ===== TAB: SEARCH ===== -->
+    <section class="tab-section active" id="tab-search">
+      <div class="section-header">
+        <h1 class="section-title">사무실 검색</h1>
+        <p class="section-desc">부처명과 키워드로 사무실 위치를 빠르게 찾아보세요</p>
+      </div>
+
+      <div class="search-card">
+        <div class="search-row">
+          <div class="search-field">
+            <label class="field-label">건물 (동)</label>
+            <select id="search-building" class="field-select">
+              <option value="">전체 동</option>
+            </select>
+          </div>
+          <div class="search-field">
+            <label class="field-label">부처명</label>
+            <select id="search-ministry" class="field-select">
+              <option value="">전체 부처</option>
+            </select>
+          </div>
+          <div class="search-field flex-2">
+            <label class="field-label">키워드 (과명, 호실번호 등)</label>
+            <div class="search-input-wrap">
+              <input type="text" id="search-keyword" class="field-input" placeholder="예: 토지정책, 352, 자동차정책..." />
+              <button id="btn-search" class="btn-search-go">검색</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="search-results" class="search-results hidden">
+        <div class="results-header">
+          <span id="result-count" class="result-count"></span>
+          <button id="btn-export-results" class="btn-sm btn-outline">Excel 내보내기</button>
+        </div>
+        <div id="results-grid" class="results-grid"></div>
+      </div>
+
+      <div id="search-empty" class="search-empty hidden">
+        <div class="empty-icon">🔍</div>
+        <p>검색 결과가 없습니다</p>
+        <p class="empty-sub">다른 키워드로 검색해보세요</p>
+      </div>
+
+      <div class="search-placeholder" id="search-placeholder">
+        <div class="placeholder-icon">🏛️</div>
+        <p class="placeholder-title">정부청사 사무실을 검색하세요</p>
+        <p class="placeholder-sub">1동 ~ 15동, 부처명, 과명, 호실 번호로 검색 가능합니다</p>
+        <div class="quick-ministries" id="quick-ministries"></div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: PHOTO UPLOAD & ANALYSIS ===== -->
+    <section class="tab-section" id="tab-upload">
+      <div class="section-header">
+        <h1 class="section-title">사진 분석 및 데이터 추출</h1>
+        <p class="section-desc">층별 안내판 사진을 업로드하면 AI가 자동으로 사무실 정보를 추출합니다</p>
+      </div>
+
+      <!-- API Key Setting -->
+      <div class="api-key-card" id="api-key-card">
+        <div class="api-key-inner">
+          <span class="api-icon">🤖</span>
+          <div class="api-text">
+            <strong>Gemini API 키 필요</strong>
+            <span>사진 자동 분석을 위해 Gemini API 키를 설정하세요</span>
+          </div>
+          <button class="btn-sm btn-primary" onclick="document.querySelector('[data-tab=settings]').click()">설정하기</button>
+        </div>
+      </div>
+
+      <div class="upload-area-wrap">
+        <div class="upload-zone" id="upload-zone">
+          <div class="upload-icon">📷</div>
+          <p class="upload-title">사진을 드래그하거나 클릭하여 업로드</p>
+          <p class="upload-hint">파일명에 동 번호 포함 권장: <code>6동_3층.jpg</code>, <code>국토부_3층.jpg</code></p>
+          <input type="file" id="file-input" accept="image/*" multiple hidden />
+          <button class="btn-upload-trigger" onclick="document.getElementById('file-input').click()">사진 선택</button>
+        </div>
+      </div>
+
+      <!-- Upload Queue -->
+      <div id="upload-queue" class="upload-queue hidden">
+        <div class="queue-header">
+          <h3>업로드된 사진 <span id="queue-count" class="badge">0</span></h3>
+          <div class="queue-actions">
+            <button id="btn-analyze-all" class="btn-primary">🤖 전체 AI 분석</button>
+            <button id="btn-clear-queue" class="btn-outline btn-sm">초기화</button>
+          </div>
+        </div>
+        <div id="queue-list" class="queue-list"></div>
+      </div>
+
+      <!-- Extracted Data Preview -->
+      <div id="extracted-data" class="extracted-data hidden">
+        <div class="extracted-header">
+          <h3>추출된 데이터 미리보기</h3>
+          <div class="extracted-actions">
+            <button id="btn-save-extracted" class="btn-primary">💾 데이터베이스에 저장</button>
+            <button id="btn-export-extracted" class="btn-outline">Excel 내보내기</button>
+          </div>
+        </div>
+        <div id="extracted-table-wrap" class="table-wrap">
+          <table id="extracted-table" class="data-table">
+            <thead>
+              <tr>
+                <th>선택</th>
+                <th>동</th>
+                <th>층</th>
+                <th>호실</th>
+                <th>부처명</th>
+                <th>부서/과명</th>
+                <th>비고</th>
+                <th>작업</th>
+              </tr>
+            </thead>
+            <tbody id="extracted-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: DATABASE ===== -->
+    <section class="tab-section" id="tab-database">
+      <div class="section-header">
+        <h1 class="section-title">데이터 관리</h1>
+        <p class="section-desc">데이터베이스를 조회하고 Excel로 내보내거나 가져올 수 있습니다</p>
+      </div>
+
+      <div class="db-toolbar">
+        <div class="db-stats" id="db-stats">
+          <div class="stat-item"><span class="stat-num" id="stat-total">0</span><span class="stat-label">전체 항목</span></div>
+          <div class="stat-item"><span class="stat-num" id="stat-ministries">0</span><span class="stat-label">부처 수</span></div>
+          <div class="stat-item"><span class="stat-num" id="stat-buildings">0</span><span class="stat-label">동 수</span></div>
+        </div>
+        <div class="db-actions">
+          <button id="btn-add-row" class="btn-primary btn-sm">+ 항목 추가</button>
+          <button id="btn-export-all" class="btn-outline btn-sm">📥 Excel 내보내기</button>
+          <label class="btn-outline btn-sm btn-file-label" for="excel-import-input">
+            📤 Excel 가져오기
+            <input type="file" id="excel-import-input" accept=".xlsx,.xls" hidden />
+          </label>
+          <button id="btn-download-template" class="btn-outline btn-sm">📋 양식 다운로드</button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="db-filter">
+        <select id="filter-building" class="field-select sm">
+          <option value="">전체 동</option>
+        </select>
+        <select id="filter-ministry" class="field-select sm">
+          <option value="">전체 부처</option>
+        </select>
+        <input type="text" id="filter-keyword" class="field-input sm" placeholder="과명, 호실 검색..." />
+        <button id="btn-filter" class="btn-sm btn-primary">필터 적용</button>
+        <button id="btn-filter-reset" class="btn-sm btn-outline">초기화</button>
+      </div>
+
+      <div class="table-wrap" id="db-table-wrap">
+        <table class="data-table" id="db-table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="select-all-db" /></th>
+              <th>동</th>
+              <th>층</th>
+              <th>호실</th>
+              <th>부처명</th>
+              <th>부서/과명</th>
+              <th>유형</th>
+              <th>비고</th>
+              <th>수정일시</th>
+              <th>작업</th>
+            </tr>
+          </thead>
+          <tbody id="db-tbody"></tbody>
+        </table>
+        <div class="table-empty hidden" id="db-empty">
+          <div class="empty-icon">📋</div>
+          <p>데이터가 없습니다</p>
+          <p class="empty-sub">사진 분석 탭에서 데이터를 추가하거나 Excel을 가져오세요</p>
+        </div>
+      </div>
+
+      <div class="db-footer">
+        <div class="selected-actions hidden" id="selected-actions">
+          <span id="selected-count">0개 선택됨</span>
+          <button id="btn-delete-selected" class="btn-danger btn-sm">선택 삭제</button>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: SETTINGS ===== -->
+    <section class="tab-section" id="tab-settings">
+      <div class="section-header">
+        <h1 class="section-title">설정</h1>
+        <p class="section-desc">API 키 및 시스템 설정을 관리합니다</p>
+      </div>
+
+      <div class="settings-card">
+        <h3 class="settings-group-title">🤖 AI 분석 설정</h3>
+        <div class="settings-row">
+          <label class="settings-label">
+            Gemini API 키
+            <span class="label-hint">사진 자동 분석에 사용됩니다</span>
+          </label>
+          <div class="settings-input-wrap">
+            <input type="password" id="api-key-input" class="field-input" placeholder="AIza..." />
+            <button id="btn-toggle-key" class="btn-icon" title="보기/숨기기">👁</button>
+          </div>
+          <button id="btn-save-api-key" class="btn-primary btn-sm">저장</button>
+        </div>
+        <p class="settings-hint">
+          💡 <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>에서 무료로 API 키를 발급받을 수 있습니다
+        </p>
+      </div>
+
+      <div class="settings-card">
+        <h3 class="settings-group-title">🏛️ 동(棟) 관리</h3>
+        <div class="buildings-list" id="buildings-list"></div>
+        <button id="btn-reset-buildings" class="btn-outline btn-sm mt-8">기본값으로 초기화</button>
+      </div>
+
+      <div class="settings-card">
+        <h3 class="settings-group-title">🕒 데이터 백업 및 복구</h3>
+        <p class="settings-hint">데이터 변경 시 자동으로 백업이 생성됩니다. 특정 시점으로 복구할 수 있습니다.</p>
+        <div class="backup-list" id="backup-list" style="margin-top: 12px; max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 8px;">
+          <!-- Backup items will be rendered here dynamically -->
+        </div>
+      </div>
+
+      <div class="settings-card danger-zone">
+        <h3 class="settings-group-title">⚠️ 위험 구역</h3>
+        <div class="settings-row">
+          <div>
+            <strong>전체 데이터 초기화</strong>
+            <p class="settings-hint">데이터베이스의 모든 사무실 정보가 삭제됩니다. 되돌릴 수 없습니다.</p>
+          </div>
+          <button id="btn-reset-all" class="btn-danger btn-sm">전체 초기화</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== MODAL: Add/Edit Row ===== -->
+  <div class="modal-overlay hidden" id="modal-row">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">항목 추가</h3>
+        <button class="modal-close" onclick="closeModal('modal-row')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-field">
+            <label>동 번호 *</label>
+            <select id="modal-building" class="field-select"></select>
+          </div>
+          <div class="form-field">
+            <label>층 *</label>
+            <input type="number" id="modal-floor" class="field-input" placeholder="예: 3" min="1" max="30" />
+          </div>
+          <div class="form-field">
+            <label>호실 *</label>
+            <input type="text" id="modal-room" class="field-input" placeholder="예: 352" />
+          </div>
+          <div class="form-field">
+            <label>부처명 *</label>
+            <input type="text" id="modal-ministry" class="field-input" placeholder="예: 국토교통부" list="ministry-datalist" />
+            <datalist id="ministry-datalist"></datalist>
+          </div>
+          <div class="form-field full">
+            <label>부서/과명 *</label>
+            <input type="text" id="modal-dept" class="field-input" placeholder="예: 자동차정책과" />
+          </div>
+          <div class="form-field">
+            <label>유형</label>
+            <select id="modal-type" class="field-select">
+              <option value="사무실">사무실</option>
+              <option value="공통시설">공통시설</option>
+              <option value="회의실">회의실</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+          <div class="form-field full">
+            <label>비고</label>
+            <input type="text" id="modal-note" class="field-input" placeholder="추가 정보..." />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-outline" onclick="closeModal('modal-row')">취소</button>
+        <button class="btn-primary" id="btn-modal-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: Confirm Delete ===== -->
+  <div class="modal-overlay hidden" id="modal-confirm">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>확인</h3>
+        <button class="modal-close" onclick="closeModal('modal-confirm')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-outline" onclick="closeModal('modal-confirm')">취소</button>
+        <button class="btn-danger" id="btn-confirm-ok">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: AI Analysis Result ===== -->
+  <div class="modal-overlay hidden" id="modal-analysis">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3>AI 분석 결과 검토</h3>
+        <button class="modal-close" onclick="closeModal('modal-analysis')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="analysis-layout">
+          <div class="analysis-image-side">
+            <img id="analysis-preview-img" src="" alt="분석 이미지" />
+          </div>
+          <div class="analysis-data-side">
+            <div class="analysis-meta">
+              <div class="form-field">
+                <label>동 (파일명에서 추출)</label>
+                <select id="analysis-building" class="field-select"></select>
+              </div>
+            </div>
+            <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+              <table class="data-table" id="analysis-result-table">
+                <thead>
+                  <tr><th>층</th><th>호실</th><th>부처명</th><th>부서/과명</th><th>유형</th><th>삭제</th></tr>
+                </thead>
+                <tbody id="analysis-result-tbody"></tbody>
+              </table>
+            </div>
+            <button id="btn-add-analysis-row" class="btn-outline btn-sm mt-8">+ 행 추가</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-outline" onclick="closeModal('modal-analysis')">취소</button>
+        <button class="btn-primary" id="btn-save-analysis">데이터베이스에 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: Password Gate ===== -->
+  <div class="modal-overlay hidden" id="modal-password">
+    <div class="modal modal-sm">
+      <div class="modal-header" style="background: linear-gradient(135deg, #1e3a5f 0%, #1a4fa0 100%);">
+        <h3>🔐 관리자 인증</h3>
+        <button class="modal-close" onclick="closePasswordModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="text-align:center; padding: 8px 0 20px;">
+          <div style="font-size:48px; margin-bottom:16px;">🤖</div>
+          <p style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">AI 분석 기능 접근</p>
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:24px;">이 기능은 관리자 전용입니다. 비밀번호를 입력하세요.</p>
+          <div style="position:relative; max-width:280px; margin:0 auto;">
+            <input
+              type="password"
+              id="password-input"
+              class="field-input"
+              placeholder="비밀번호 입력..."
+              style="padding-right:44px; text-align:center; font-size:16px; letter-spacing:4px;"
+            />
+            <button id="btn-toggle-pw" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted);">👁</button>
+          </div>
+          <p id="password-error" class="hidden" style="color:var(--danger);font-size:13px;margin-top:10px;font-weight:600;">❌ 비밀번호가 틀렸습니다</p>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:center; gap:12px;">
+        <button class="btn-outline" onclick="closePasswordModal()">취소</button>
+        <button class="btn-primary" id="btn-password-confirm" style="min-width:100px;">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
