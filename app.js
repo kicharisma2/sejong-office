@@ -1334,15 +1334,15 @@ function dateStr() {
 function setupSettings() {
   document.getElementById('btn-save-api-key').addEventListener('click', () => {
     const key = document.getElementById('api-key-input').value.trim();
+    if (key === '****************') {
+      toast('API 키가 이미 저장되어 있습니다', 'info');
+      return;
+    }
     appState.settings.apiKey = key;
     saveSettings();
     checkApiKeyStatus();
-    toast('API 키가 저장되었습니다', 'success');
-  });
-
-  document.getElementById('btn-toggle-key').addEventListener('click', () => {
-    const inp = document.getElementById('api-key-input');
-    inp.type = inp.type === 'password' ? 'text' : 'password';
+    renderSettings();
+    toast(key ? 'API 키가 저장되었습니다' : 'API 키가 삭제되었습니다', 'success');
   });
 
   document.getElementById('btn-reset-buildings').addEventListener('click', () => {
@@ -1370,8 +1370,13 @@ function setupSettings() {
 }
 
 function renderSettings() {
-  // API Key
-  document.getElementById('api-key-input').value = appState.settings.apiKey || '';
+  // API Key - mask the key to prevent copy/pasting or viewing
+  const keyInput = document.getElementById('api-key-input');
+  if (appState.settings.apiKey) {
+    keyInput.value = '****************';
+  } else {
+    keyInput.value = '';
+  }
   // Buildings
   const list = document.getElementById('buildings-list');
   list.innerHTML = appState.buildings.map(b =>
